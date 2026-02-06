@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
-import { Download, FileUp, Pencil, Plus, Search } from 'lucide-react';
+import { Download, FileUp, Pencil, Plus, Search, FileSpreadsheet } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -114,6 +115,46 @@ export default function Demandes() {
     setIsDialogOpen(false);
   };
 
+  // Export Excel
+  const handleExportExcel = () => {
+    const exportData = demandes.map(d => ({
+      'Service': d.service,
+      'Domaine': d.domaine,
+      'Catégorie': d.categorie,
+      'Description': d.description,
+      'Justification': d.justification,
+      'Budget titre': d.budgetTitre,
+      'Budget validé': d.budgetValide,
+      'Statut': d.statut,
+      'Date création': d.dateCreation,
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Demandes');
+    
+    // Auto-size columns
+    const colWidths = [
+      { wch: 20 }, // Service
+      { wch: 20 }, // Domaine
+      { wch: 15 }, // Catégorie
+      { wch: 40 }, // Description
+      { wch: 30 }, // Justification
+      { wch: 15 }, // Budget titre
+      { wch: 15 }, // Budget validé
+      { wch: 12 }, // Statut
+      { wch: 12 }, // Date création
+    ];
+    ws['!cols'] = colWidths;
+
+    XLSX.writeFile(wb, `demandes_budgetaires_${new Date().toISOString().split('T')[0]}.xlsx`);
+
+    toast({
+      title: "Export réussi",
+      description: `${demandes.length} demandes exportées en Excel.`,
+    });
+  };
+
   // Export CSV
   const handleExportCSV = () => {
     const headers = ['Service', 'Domaine', 'Catégorie', 'Description', 'Justification', 'Budget titre', 'Budget validé', 'Statut', 'Date création'];
@@ -148,53 +189,103 @@ export default function Demandes() {
     });
   };
 
-  // Import CSV
-  const handleImportCSV = (event: React.ChangeEvent<HTMLInputElement>) => {
+  // Parse row data to Demande
+  const parseRowToDemande = (row: Record<string, unknown>, index: number): Demande => {
+    const service = String(row['Service'] || row['service'] || '');
+    const domaine = String(row['Domaine'] || row['domaine'] || '');
+    const categorieRaw = String(row['Catégorie'] || row['categorie'] || row['Categorie'] || '');
+    const categorie = categorieRaw === 'Investissement' ? 'Investissement' : 'Fonctionnement';
+    const description = String(row['Description'] || row['description'] || '');
+    const justification = String(row['Justification'] || row['justification'] || '');
+    const budgetTitre = parseFloat(String(row['Budget titre'] || row['budget_titre'] || row['BudgetTitre'] || 0)) || 0;
+    const budgetValide = parseFloat(String(row['Budget validé'] || row['budget_valide'] || row['BudgetValide'] || 0)) || 0;
+    const statutRaw = String(row['Statut'] || row['statut'] || 'Brouillon');
+    const statut = (['Brouillon', 'En attente', 'Validé', 'Rejeté'].includes(statutRaw) ? statutRaw : 'Brouillon') as Demande['statut'];
+    const dateCreation = String(row['Date création'] || row['date_creation'] || row['DateCreation'] || new Date().toISOString().split('T')[0]);
+
+    return {
+      id: String(Date.now() + index),
+      service,
+      domaine,
+      categorie,
+      description,
+      justification,
+      budgetTitre,
+      budgetValide,
+      statut,
+      dateCreation,
+    };
+  };
+
+  // Import file (Excel or CSV)
+  const handleImportFile = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const text = e.target?.result as string;
-        const lines = text.split('\n').filter(line => line.trim());
-        
-        // Skip header
-        const dataLines = lines.slice(1);
-        
-        const newDemandes: Demande[] = dataLines.map((line, index) => {
-          const values = line.split(';').map(v => v.replace(/^"|"$/g, '').replace(/""/g, '"').trim());
-          
-          return {
-            id: String(Date.now() + index),
-            service: values[0] || '',
-            domaine: values[1] || '',
-            categorie: (values[2] === 'Investissement' ? 'Investissement' : 'Fonctionnement') as 'Fonctionnement' | 'Investissement',
-            description: values[3] || '',
-            justification: values[4] || '',
-            budgetTitre: parseFloat(values[5]) || 0,
-            budgetValide: parseFloat(values[6]) || 0,
-            statut: (['Brouillon', 'En attente', 'Validé', 'Rejeté'].includes(values[7]) ? values[7] : 'Brouillon') as Demande['statut'],
-            dateCreation: values[8] || new Date().toISOString().split('T')[0],
-          };
-        });
+    const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
 
-        setDemandes(prev => [...newDemandes, ...prev]);
-        
-        toast({
-          title: "Import réussi",
-          description: `${newDemandes.length} demandes importées.`,
-        });
-      } catch (error) {
-        toast({
-          title: "Erreur d'import",
-          description: "Le fichier CSV n'a pas pu être lu correctement.",
-          variant: "destructive",
-        });
-      }
-    };
-    reader.readAsText(file);
-    
+    if (isExcel) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const jsonData = XLSX.utils.sheet_to_json(firstSheet) as Record<string, unknown>[];
+
+          const newDemandes = jsonData.map((row, index) => parseRowToDemande(row, index));
+
+          setDemandes(prev => [...newDemandes, ...prev]);
+
+          toast({
+            title: "Import Excel réussi",
+            description: `${newDemandes.length} demandes importées.`,
+          });
+        } catch (error) {
+          toast({
+            title: "Erreur d'import",
+            description: "Le fichier Excel n'a pas pu être lu correctement.",
+            variant: "destructive",
+          });
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      // CSV import
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const text = e.target?.result as string;
+          const lines = text.split('\n').filter(line => line.trim());
+          const headers = lines[0].split(';').map(h => h.trim());
+          const dataLines = lines.slice(1);
+
+          const newDemandes: Demande[] = dataLines.map((line, index) => {
+            const values = line.split(';').map(v => v.replace(/^"|"$/g, '').replace(/""/g, '"').trim());
+            const row: Record<string, unknown> = {};
+            headers.forEach((header, i) => {
+              row[header] = values[i] || '';
+            });
+            return parseRowToDemande(row, index);
+          });
+
+          setDemandes(prev => [...newDemandes, ...prev]);
+
+          toast({
+            title: "Import CSV réussi",
+            description: `${newDemandes.length} demandes importées.`,
+          });
+        } catch (error) {
+          toast({
+            title: "Erreur d'import",
+            description: "Le fichier CSV n'a pas pu être lu correctement.",
+            variant: "destructive",
+          });
+        }
+      };
+      reader.readAsText(file);
+    }
+
     // Reset input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -207,17 +298,21 @@ export default function Demandes() {
         <input
           type="file"
           ref={fileInputRef}
-          accept=".csv"
-          onChange={handleImportCSV}
+          accept=".csv,.xlsx,.xls"
+          onChange={handleImportFile}
           className="hidden"
         />
         <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
           <FileUp className="w-4 h-4 mr-2" />
-          Importer CSV
+          Importer
+        </Button>
+        <Button variant="outline" size="sm" onClick={handleExportExcel}>
+          <FileSpreadsheet className="w-4 h-4 mr-2" />
+          Export Excel
         </Button>
         <Button variant="outline" size="sm" onClick={handleExportCSV}>
           <Download className="w-4 h-4 mr-2" />
-          Exporter CSV
+          Export CSV
         </Button>
         <Button size="sm" onClick={openNewDialog}>
           <Plus className="w-4 h-4 mr-2" />
