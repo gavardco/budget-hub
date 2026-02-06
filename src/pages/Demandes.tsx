@@ -65,6 +65,7 @@ const loadDemandes = (): Demande[] => {
 const saveDemandes = (demandes: Demande[]) => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(demandes));
+    console.log(`✅ Saved ${demandes.length} demandes to localStorage`);
   } catch (error) {
     console.error('Error saving demandes to localStorage:', error);
   }
@@ -442,11 +443,16 @@ export default function Demandes() {
 
           const newDemandes = jsonData.map((row, index) => parseRowToDemande(row, index));
 
-          setDemandes(prev => [...newDemandes, ...prev]);
+          setDemandes(prev => {
+            const updated = [...newDemandes, ...prev];
+            // Force immediate save to localStorage
+            saveDemandes(updated);
+            return updated;
+          });
 
           toast({
             title: "Import Excel réussi",
-            description: `${newDemandes.length} demandes importées.`,
+            description: `${newDemandes.length} demandes importées et sauvegardées.`,
           });
         } catch (error) {
           toast({
@@ -476,11 +482,16 @@ export default function Demandes() {
             return parseRowToDemande(row, index);
           });
 
-          setDemandes(prev => [...newDemandes, ...prev]);
+          setDemandes(prev => {
+            const updated = [...newDemandes, ...prev];
+            // Force immediate save to localStorage
+            saveDemandes(updated);
+            return updated;
+          });
 
           toast({
             title: "Import CSV réussi",
-            description: `${newDemandes.length} demandes importées.`,
+            description: `${newDemandes.length} demandes importées et sauvegardées.`,
           });
         } catch (error) {
           toast({
