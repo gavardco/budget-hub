@@ -251,27 +251,11 @@ export const depenses: Depense[] = [
 export const campagnes: Campagne[] = [
   {
     id: '1',
-    nom: 'Budget 2024',
-    periode: '2024',
-    dateDebut: '2023-09-01',
-    dateFin: '2023-12-15',
-    etat: 'Clôturé',
-  },
-  {
-    id: '2',
-    nom: 'Budget 2025',
-    periode: '2025',
-    dateDebut: '2024-09-01',
-    dateFin: '2024-12-15',
-    etat: 'Ouvert',
-  },
-  {
-    id: '3',
     nom: 'Budget 2026',
     periode: '2026',
     dateDebut: '2025-09-01',
     dateFin: '2025-12-15',
-    etat: 'En préparation',
+    etat: 'Ouvert',
   },
 ];
 
