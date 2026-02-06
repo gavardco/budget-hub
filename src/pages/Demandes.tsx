@@ -74,8 +74,12 @@ export default function Demandes() {
   const [demandes, setDemandes] = useState<Demande[]>(loadDemandes);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterService, setFilterService] = useState<string>('all');
+  const [filterDomaine, setFilterDomaine] = useState<string>('all');
   const [filterCategorie, setFilterCategorie] = useState<string>('all');
   const [filterStatut, setFilterStatut] = useState<string>('all');
+
+  // Extract unique domaines from demandes
+  const uniqueDomaines = [...new Set(demandes.map(d => d.domaine).filter(Boolean))].sort();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingDemande, setEditingDemande] = useState<Demande | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -103,9 +107,10 @@ export default function Demandes() {
       d.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
       d.service.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesService = filterService === 'all' || d.service === filterService;
+    const matchesDomaine = filterDomaine === 'all' || d.domaine === filterDomaine;
     const matchesCategorie = filterCategorie === 'all' || d.categorie === filterCategorie;
     const matchesStatut = filterStatut === 'all' || d.statut === filterStatut;
-    return matchesSearch && matchesService && matchesCategorie && matchesStatut;
+    return matchesSearch && matchesService && matchesDomaine && matchesCategorie && matchesStatut;
   });
 
   const openNewDialog = () => {
@@ -542,6 +547,17 @@ export default function Demandes() {
               <SelectItem value="all">Tous - Service</SelectItem>
               {services.map((s) => (
                 <SelectItem key={s.id} value={s.nom}>{s.nom}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={filterDomaine} onValueChange={setFilterDomaine}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Tous - Domaine" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous - Domaine</SelectItem>
+              {uniqueDomaines.map((d) => (
+                <SelectItem key={d} value={d}>{d}</SelectItem>
               ))}
             </SelectContent>
           </Select>
