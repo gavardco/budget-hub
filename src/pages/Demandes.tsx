@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Download, FileUp, Pencil, Plus, Search, FileSpreadsheet } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { MainLayout } from '@/components/layout/MainLayout';
@@ -36,8 +36,32 @@ import { toast } from '@/hooks/use-toast';
 const categories = ['Fonctionnement', 'Investissement'];
 const statuts = ['Brouillon', 'En attente', 'Validé', 'Rejeté'];
 
+const STORAGE_KEY = 'budget-pro-demandes';
+
+// Load demandes from localStorage or use initial data
+const loadDemandes = (): Demande[] => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (error) {
+    console.error('Error loading demandes from localStorage:', error);
+  }
+  return initialDemandes;
+};
+
+// Save demandes to localStorage
+const saveDemandes = (demandes: Demande[]) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(demandes));
+  } catch (error) {
+    console.error('Error saving demandes to localStorage:', error);
+  }
+};
+
 export default function Demandes() {
-  const [demandes, setDemandes] = useState<Demande[]>(initialDemandes);
+  const [demandes, setDemandes] = useState<Demande[]>(loadDemandes);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterService, setFilterService] = useState<string>('all');
   const [filterCategorie, setFilterCategorie] = useState<string>('all');
@@ -56,6 +80,11 @@ export default function Demandes() {
     budgetValide: 0,
     statut: 'Brouillon' as Demande['statut'],
   });
+
+  // Persist demandes to localStorage whenever they change
+  useEffect(() => {
+    saveDemandes(demandes);
+  }, [demandes]);
 
   const filteredDemandes = demandes.filter((d) => {
     const matchesSearch =
