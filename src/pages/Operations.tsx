@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Pencil, Plus } from 'lucide-react';
+import { FileSpreadsheet, Pencil, Plus } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -31,6 +32,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { operations as initialOperations, formatCurrency, Operation } from '@/lib/mockData';
 import { cn } from '@/lib/utils';
+import { toast } from '@/hooks/use-toast';
 
 const statutOptions = ['Planifié', 'En cours', 'Terminé', 'Annulé'];
 
@@ -95,9 +97,49 @@ export default function Operations() {
     return operation.budgetPrevu - operation.depenses;
   };
 
+  // Export Excel
+  const handleExportExcel = () => {
+    const exportData = operations.map(o => ({
+      'Nom': o.nom,
+      'Description': o.description,
+      'Budget prévu': o.budgetPrevu,
+      'Dépenses': o.depenses,
+      'Reste': o.budgetPrevu - o.depenses,
+      'Période': o.periode,
+      'Statut': o.statut,
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Opérations');
+    
+    // Auto-size columns
+    const colWidths = [
+      { wch: 35 }, // Nom
+      { wch: 45 }, // Description
+      { wch: 15 }, // Budget prévu
+      { wch: 15 }, // Dépenses
+      { wch: 15 }, // Reste
+      { wch: 12 }, // Période
+      { wch: 12 }, // Statut
+    ];
+    ws['!cols'] = colWidths;
+
+    XLSX.writeFile(wb, `operations_${new Date().toISOString().split('T')[0]}.xlsx`);
+
+    toast({
+      title: "Export réussi",
+      description: `${operations.length} opérations exportées en Excel.`,
+    });
+  };
+
   return (
     <MainLayout>
       <PageHeader title="Opérations">
+        <Button variant="outline" size="sm" onClick={handleExportExcel}>
+          <FileSpreadsheet className="w-4 h-4 mr-2" />
+          Export Excel
+        </Button>
         <Button size="sm" onClick={openNewDialog}>
           <Plus className="w-4 h-4 mr-2" />
           Nouvelle opération
