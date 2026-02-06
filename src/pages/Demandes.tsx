@@ -237,12 +237,51 @@ export default function Demandes() {
     return isNaN(num) ? 0 : num;
   };
 
+  // Normalize service name to match our services list
+  const normalizeServiceName = (rawService: string): string => {
+    const normalized = rawService.trim().toUpperCase();
+    
+    // Map common variations to our standard names
+    const serviceMap: Record<string, string> = {
+      'SERVICE TECHNIQUE': 'Service Technique',
+      'DIRECTION': 'Direction',
+      'FINANCES': 'Finances',
+      'ACCUEIL À LA POPULATION': 'Accueil à la population',
+      'ACCUEIL A LA POPULATION': 'Accueil à la population',
+      'RESSOURCES HUMAINES': 'Ressources humaines',
+      'RH': 'Ressources humaines',
+      'MÉDIATHÈQUE': 'Médiathèque',
+      'MEDIATHEQUE': 'Médiathèque',
+      'ENFANCE JEUNESSE': 'Enfance jeunesse',
+      'ENFANCE-JEUNESSE': 'Enfance jeunesse',
+      'RESTAURATION SCOLAIRE': 'Restauration scolaire',
+      'POLE ACCUEIL': 'Accueil à la population',
+      'PÔLE ACCUEIL': 'Accueil à la population',
+    };
+    
+    // Check for exact match first
+    if (serviceMap[normalized]) {
+      return serviceMap[normalized];
+    }
+    
+    // Try to find partial match
+    for (const [key, value] of Object.entries(serviceMap)) {
+      if (normalized.includes(key) || key.includes(normalized)) {
+        return value;
+      }
+    }
+    
+    // If no match, return the original (title case)
+    return rawService.trim();
+  };
+
   // Parse row data to Demande (handles multiple CSV column formats)
   const parseRowToDemande = (row: Record<string, unknown>, index: number): Demande => {
-    // Service - handle various column names
-    const service = String(
+    // Service - handle various column names and normalize
+    const rawService = String(
       row['SERVICE'] || row['Service'] || row['service'] || ''
     ).trim();
+    const service = normalizeServiceName(rawService);
 
     // Domaine
     const domaine = String(
@@ -272,6 +311,9 @@ export default function Demandes() {
       row['BUDGET '] || row['BUDGET'] || row['BUDGET TTC'] || 
       row['Budget titre'] || row['budget_titre'] || row['BudgetTitre'] || 0
     );
+
+    // Log pour debug
+    console.log('Parsed row:', { rawService, service, domaine, categorie, description, budgetTitre });
 
     // Budget validé - handle various column names
     const budgetValide = parseAmount(
