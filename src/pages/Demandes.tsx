@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Download, FileUp, Pencil, Plus, Search, FileSpreadsheet } from 'lucide-react';
+import { Download, FileUp, Pencil, Plus, Search, FileSpreadsheet, Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -28,6 +28,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { demandes as initialDemandes, services, formatCurrency, Demande } from '@/lib/mockData';
@@ -68,6 +78,8 @@ export default function Demandes() {
   const [filterStatut, setFilterStatut] = useState<string>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingDemande, setEditingDemande] = useState<Demande | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [demandeToDelete, setDemandeToDelete] = useState<Demande | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
@@ -142,6 +154,23 @@ export default function Demandes() {
       setDemandes([newDemande, ...demandes]);
     }
     setIsDialogOpen(false);
+  };
+
+  const openDeleteDialog = (demande: Demande) => {
+    setDemandeToDelete(demande);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDelete = () => {
+    if (demandeToDelete) {
+      setDemandes(demandes.filter(d => d.id !== demandeToDelete.id));
+      toast({
+        title: "Demande supprimée",
+        description: "La demande a été supprimée avec succès.",
+      });
+    }
+    setDeleteDialogOpen(false);
+    setDemandeToDelete(null);
   };
 
   // Export Excel
@@ -553,7 +582,7 @@ export default function Demandes() {
                 <TableHead className="text-right">Budget titre</TableHead>
                 <TableHead className="text-right">Budget validé</TableHead>
                 <TableHead>Statut</TableHead>
-                <TableHead className="w-[60px]">Actions</TableHead>
+                <TableHead className="w-[100px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -568,13 +597,23 @@ export default function Demandes() {
                   <TableCell className="text-right font-medium">{formatCurrency(demande.budgetValide)}</TableCell>
                   <TableCell><StatusBadge status={demande.statut} /></TableCell>
                   <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => openEditDialog(demande)}
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openEditDialog(demande)}
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openDeleteDialog(demande)}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -699,6 +738,24 @@ export default function Demandes() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer cette demande ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible. La demande "{demandeToDelete?.description}" sera définitivement supprimée.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </MainLayout>
   );
 }
