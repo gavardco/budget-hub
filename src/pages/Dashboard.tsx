@@ -78,7 +78,6 @@ export default function Dashboard() {
     resteADepenser: demandes.reduce((sum, d) => sum + d.budgetValide, 0) - depenses.reduce((sum, d) => sum + d.montantTTC, 0),
   };
 
-  const lastDemandes = demandes.slice(0, 5);
   const lastDepenses = depenses.slice(0, 5);
 
   return (
@@ -133,46 +132,8 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* Recent Lists */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Last Demandes */}
-          <Card className="animate-fade-in">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <FileText className="w-5 h-5 text-primary" />
-                Dernières demandes
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="divide-y divide-border">
-                {lastDemandes.map((demande) => (
-                  <div
-                    key={demande.id}
-                    className="table-row-hover px-6 py-3"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-foreground truncate">
-                          {demande.description}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {demande.service} • {demande.categorie}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-3 ml-4">
-                        <span className="text-sm font-medium text-foreground">
-                          {formatCurrency(demande.budgetTitre)}
-                        </span>
-                        <StatusBadge status={demande.statut} />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Last Depenses */}
+        {/* Last Depenses */}
+        <div className="grid grid-cols-1 gap-6">
           <Card className="animate-fade-in">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
