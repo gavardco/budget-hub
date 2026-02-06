@@ -189,16 +189,50 @@ export default function Demandes() {
     });
   };
 
-  // Parse amount string to number (handles "1 500,00 €", "1500.00", "1500,00", etc.)
+  // Parse amount string to number (handles multiple formats):
+  // - "€ 40,000" (English format with € prefix)
+  // - "1 500,00 €" (French format with € suffix)
+  // - "1500.00", "1500,00", etc.
   const parseAmount = (value: unknown): number => {
     if (typeof value === 'number') return value;
     if (!value) return 0;
-    const str = String(value)
-      .replace(/\s/g, '') // Remove spaces
-      .replace('€', '') // Remove €
-      .replace(/\./g, '') // Remove thousand separators (dots in French)
-      .replace(',', '.') // Replace decimal comma with dot
-      .trim();
+    
+    let str = String(value).trim();
+    
+    // Remove € symbol and spaces
+    str = str.replace(/€/g, '').replace(/\s/g, '').trim();
+    
+    // Detect format: if we have both comma and dot, determine which is decimal separator
+    const hasComma = str.includes(',');
+    const hasDot = str.includes('.');
+    
+    if (hasComma && hasDot) {
+      // Both present: last one is decimal separator
+      const lastComma = str.lastIndexOf(',');
+      const lastDot = str.lastIndexOf('.');
+      if (lastComma > lastDot) {
+        // Format: 1.500,00 (European)
+        str = str.replace(/\./g, '').replace(',', '.');
+      } else {
+        // Format: 1,500.00 (English)
+        str = str.replace(/,/g, '');
+      }
+    } else if (hasComma) {
+      // Only comma: check if it's thousand separator (e.g., "40,000") or decimal (e.g., "40,50")
+      const parts = str.split(',');
+      if (parts.length === 2 && parts[1].length === 3) {
+        // Thousand separator (e.g., "40,000" -> 40000)
+        str = str.replace(/,/g, '');
+      } else if (parts.length === 2 && parts[1].length <= 2) {
+        // Decimal separator (e.g., "40,50" -> 40.50)
+        str = str.replace(',', '.');
+      } else {
+        // Multiple commas = thousand separators
+        str = str.replace(/,/g, '');
+      }
+    }
+    // If only dot, it's already in correct format
+    
     const num = parseFloat(str);
     return isNaN(num) ? 0 : num;
   };
