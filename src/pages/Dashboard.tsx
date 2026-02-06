@@ -1,14 +1,74 @@
+import { useState, useEffect } from 'react';
 import { FileText, Receipt, TrendingDown, Wallet } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { KPICard } from '@/components/ui/KPICard';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { demandes, depenses, formatCurrency, formatDate, getTotals } from '@/lib/mockData';
+import { 
+  demandes as initialDemandes, 
+  depenses as initialDepenses, 
+  formatCurrency, 
+  formatDate, 
+  Demande, 
+  Depense 
+} from '@/lib/mockData';
 import dashboardBanner from '@/assets/dashboard-banner.png';
 
+const DEMANDES_STORAGE_KEY = 'budget-pro-demandes';
+const DEPENSES_STORAGE_KEY = 'budget-pro-depenses';
+
+// Load data from localStorage
+const loadFromStorage = <T,>(key: string, initial: T[]): T[] => {
+  try {
+    const stored = localStorage.getItem(key);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (error) {
+    console.error(`Error loading ${key} from localStorage:`, error);
+  }
+  return initial;
+};
+
 export default function Dashboard() {
-  const totals = getTotals();
+  const [demandes, setDemandes] = useState<Demande[]>(() => 
+    loadFromStorage(DEMANDES_STORAGE_KEY, initialDemandes)
+  );
+  const [depenses, setDepenses] = useState<Depense[]>(() => 
+    loadFromStorage(DEPENSES_STORAGE_KEY, initialDepenses)
+  );
+
+  // Listen for storage changes (when data is updated in other tabs/pages)
+  useEffect(() => {
+    const handleStorageChange = () => {
+      setDemandes(loadFromStorage(DEMANDES_STORAGE_KEY, initialDemandes));
+      setDepenses(loadFromStorage(DEPENSES_STORAGE_KEY, initialDepenses));
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also check on focus to catch same-tab updates
+    const handleFocus = () => {
+      setDemandes(loadFromStorage(DEMANDES_STORAGE_KEY, initialDemandes));
+      setDepenses(loadFromStorage(DEPENSES_STORAGE_KEY, initialDepenses));
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, []);
+
+  // Calculate totals from current data
+  const totals = {
+    budgetDemande: demandes.reduce((sum, d) => sum + d.budgetTitre, 0),
+    budgetValide: demandes.reduce((sum, d) => sum + d.budgetValide, 0),
+    totalDepenses: depenses.reduce((sum, d) => sum + d.montant, 0),
+    resteADepenser: demandes.reduce((sum, d) => sum + d.budgetValide, 0) - depenses.reduce((sum, d) => sum + d.montant, 0),
+  };
+
   const lastDemandes = demandes.slice(0, 5);
   const lastDepenses = depenses.slice(0, 5);
 
