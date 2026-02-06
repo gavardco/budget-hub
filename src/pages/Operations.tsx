@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FileSpreadsheet, Pencil, Plus, Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { MainLayout } from '@/components/layout/MainLayout';
@@ -46,8 +46,32 @@ import { toast } from '@/hooks/use-toast';
 
 const statutOptions = ['Planifié', 'En cours', 'Terminé', 'Annulé'];
 
+const STORAGE_KEY = 'budget-pro-operations';
+
+// Load operations from localStorage or use initial data
+const loadOperations = (): Operation[] => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (error) {
+    console.error('Error loading operations from localStorage:', error);
+  }
+  return initialOperations;
+};
+
+// Save operations to localStorage
+const saveOperations = (operations: Operation[]) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(operations));
+  } catch (error) {
+    console.error('Error saving operations to localStorage:', error);
+  }
+};
+
 export default function Operations() {
-  const [operations, setOperations] = useState<Operation[]>(initialOperations);
+  const [operations, setOperations] = useState<Operation[]>(loadOperations);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingOperation, setEditingOperation] = useState<Operation | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -87,6 +111,11 @@ export default function Operations() {
     });
     setIsDialogOpen(true);
   };
+
+  // Persist operations to localStorage whenever they change
+  useEffect(() => {
+    saveOperations(operations);
+  }, [operations]);
 
   const handleSubmit = () => {
     if (editingOperation) {
