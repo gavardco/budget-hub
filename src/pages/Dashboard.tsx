@@ -7,16 +7,25 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   demandes as initialDemandes, 
-  depenses as initialDepenses, 
   formatCurrency, 
   formatDate, 
-  Demande, 
-  Depense 
+  Demande
 } from '@/lib/mockData';
 import dashboardBanner from '@/assets/dashboard-banner.png';
 
 const DEMANDES_STORAGE_KEY = 'budget-pro-demandes';
-const DEPENSES_STORAGE_KEY = 'budget-pro-depenses';
+const DEPENSES_V2_STORAGE_KEY = 'budget-pro-depenses-v2';
+
+// New depense format
+interface DepenseV2 {
+  id: string;
+  service: string;
+  operation: string;
+  date: string;
+  description: string;
+  montantTTC: number;
+  fournisseur: string;
+}
 
 // Load data from localStorage
 const loadFromStorage = <T,>(key: string, initial: T[]): T[] => {
@@ -35,15 +44,15 @@ export default function Dashboard() {
   const [demandes, setDemandes] = useState<Demande[]>(() => 
     loadFromStorage(DEMANDES_STORAGE_KEY, initialDemandes)
   );
-  const [depenses, setDepenses] = useState<Depense[]>(() => 
-    loadFromStorage(DEPENSES_STORAGE_KEY, initialDepenses)
+  const [depenses, setDepenses] = useState<DepenseV2[]>(() => 
+    loadFromStorage<DepenseV2>(DEPENSES_V2_STORAGE_KEY, [])
   );
 
   // Listen for storage changes (when data is updated in other tabs/pages)
   useEffect(() => {
     const handleStorageChange = () => {
       setDemandes(loadFromStorage(DEMANDES_STORAGE_KEY, initialDemandes));
-      setDepenses(loadFromStorage(DEPENSES_STORAGE_KEY, initialDepenses));
+      setDepenses(loadFromStorage<DepenseV2>(DEPENSES_V2_STORAGE_KEY, []));
     };
 
     window.addEventListener('storage', handleStorageChange);
@@ -51,7 +60,7 @@ export default function Dashboard() {
     // Also check on focus to catch same-tab updates
     const handleFocus = () => {
       setDemandes(loadFromStorage(DEMANDES_STORAGE_KEY, initialDemandes));
-      setDepenses(loadFromStorage(DEPENSES_STORAGE_KEY, initialDepenses));
+      setDepenses(loadFromStorage<DepenseV2>(DEPENSES_V2_STORAGE_KEY, []));
     };
     window.addEventListener('focus', handleFocus);
 
@@ -65,8 +74,8 @@ export default function Dashboard() {
   const totals = {
     budgetDemande: demandes.reduce((sum, d) => sum + d.budgetTitre, 0),
     budgetValide: demandes.reduce((sum, d) => sum + d.budgetValide, 0),
-    totalDepenses: depenses.reduce((sum, d) => sum + d.montant, 0),
-    resteADepenser: demandes.reduce((sum, d) => sum + d.budgetValide, 0) - depenses.reduce((sum, d) => sum + d.montant, 0),
+    totalDepenses: depenses.reduce((sum, d) => sum + d.montantTTC, 0),
+    resteADepenser: demandes.reduce((sum, d) => sum + d.budgetValide, 0) - depenses.reduce((sum, d) => sum + d.montantTTC, 0),
   };
 
   const lastDemandes = demandes.slice(0, 5);
@@ -173,29 +182,34 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent className="p-0">
               <div className="divide-y divide-border">
-                {lastDepenses.map((depense) => (
-                  <div
-                    key={depense.id}
-                    className="table-row-hover px-6 py-3"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-foreground truncate">
-                          {depense.libelle}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {formatDate(depense.date)} • {depense.rattachement}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-3 ml-4">
-                        <span className="text-sm font-medium text-foreground">
-                          {formatCurrency(depense.montant)}
-                        </span>
-                        <StatusBadge status={depense.type} />
+                {lastDepenses.length === 0 ? (
+                  <div className="px-6 py-8 text-center text-muted-foreground">
+                    Aucune dépense enregistrée
+                  </div>
+                ) : (
+                  lastDepenses.map((depense) => (
+                    <div
+                      key={depense.id}
+                      className="table-row-hover px-6 py-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-foreground truncate">
+                            {depense.description}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {formatDate(depense.date)} • {depense.service}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3 ml-4">
+                          <span className="text-sm font-medium text-foreground">
+                            {formatCurrency(depense.montantTTC)}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
