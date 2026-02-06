@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FileSpreadsheet, Pencil, Plus } from 'lucide-react';
+import { FileSpreadsheet, Pencil, Plus, Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -28,6 +28,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { operations as initialOperations, formatCurrency, Operation } from '@/lib/mockData';
@@ -40,6 +50,8 @@ export default function Operations() {
   const [operations, setOperations] = useState<Operation[]>(initialOperations);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingOperation, setEditingOperation] = useState<Operation | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [operationToDelete, setOperationToDelete] = useState<Operation | null>(null);
 
   const [formData, setFormData] = useState({
     nom: '',
@@ -91,6 +103,23 @@ export default function Operations() {
       setOperations([newOperation, ...operations]);
     }
     setIsDialogOpen(false);
+  };
+
+  const openDeleteDialog = (operation: Operation) => {
+    setOperationToDelete(operation);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDelete = () => {
+    if (operationToDelete) {
+      setOperations(operations.filter(o => o.id !== operationToDelete.id));
+      toast({
+        title: "Opération supprimée",
+        description: "L'opération a été supprimée avec succès.",
+      });
+    }
+    setDeleteDialogOpen(false);
+    setOperationToDelete(null);
   };
 
   const getReste = (operation: Operation) => {
@@ -159,7 +188,7 @@ export default function Operations() {
                 <TableHead className="text-right">Reste</TableHead>
                 <TableHead>Période</TableHead>
                 <TableHead>Statut</TableHead>
-                <TableHead className="w-[60px]">Actions</TableHead>
+                <TableHead className="w-[100px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -180,13 +209,23 @@ export default function Operations() {
                     <TableCell>{operation.periode || '-'}</TableCell>
                     <TableCell><StatusBadge status={operation.statut} /></TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openEditDialog(operation)}
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openEditDialog(operation)}
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openDeleteDialog(operation)}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
@@ -279,6 +318,24 @@ export default function Operations() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer cette opération ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible. L'opération "{operationToDelete?.nom}" sera définitivement supprimée.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </MainLayout>
   );
 }
