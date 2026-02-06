@@ -144,7 +144,7 @@ export default function Depenses() {
     const depenseData: DepenseItem = {
       id: editingDepense?.id || Date.now().toString(),
       service: formData.service,
-      operation: formData.operation,
+      operation: formData.operation === 'none' ? '' : formData.operation,
       date: formData.date,
       description: formData.description,
       montantTTC: parseFloat(formData.montantTTC) || 0,
@@ -422,7 +422,7 @@ export default function Depenses() {
                     <SelectValue placeholder="Sélectionner..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Aucune</SelectItem>
+                    <SelectItem value="none">Aucune</SelectItem>
                     {operations.map((op) => (
                       <SelectItem key={op.id} value={op.nom}>
                         {op.nom}
