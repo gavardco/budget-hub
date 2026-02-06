@@ -14,7 +14,123 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      demandes: {
+        Row: {
+          budget_titre: number
+          budget_valide: number
+          categorie: string
+          created_at: string
+          date_creation: string
+          description: string
+          domaine: string
+          id: string
+          justification: string
+          service: string
+          statut: string
+          updated_at: string
+        }
+        Insert: {
+          budget_titre?: number
+          budget_valide?: number
+          categorie: string
+          created_at?: string
+          date_creation?: string
+          description?: string
+          domaine?: string
+          id?: string
+          justification?: string
+          service: string
+          statut?: string
+          updated_at?: string
+        }
+        Update: {
+          budget_titre?: number
+          budget_valide?: number
+          categorie?: string
+          created_at?: string
+          date_creation?: string
+          description?: string
+          domaine?: string
+          id?: string
+          justification?: string
+          service?: string
+          statut?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      depenses: {
+        Row: {
+          created_at: string
+          date: string
+          description: string
+          fournisseur: string
+          id: string
+          montant_ttc: number
+          operation: string
+          service: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          date?: string
+          description?: string
+          fournisseur?: string
+          id?: string
+          montant_ttc?: number
+          operation?: string
+          service: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          description?: string
+          fournisseur?: string
+          id?: string
+          montant_ttc?: number
+          operation?: string
+          service?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      operations: {
+        Row: {
+          budget_prevu: number
+          created_at: string
+          depenses: number
+          description: string
+          id: string
+          nom: string
+          periode: string
+          statut: string
+          updated_at: string
+        }
+        Insert: {
+          budget_prevu?: number
+          created_at?: string
+          depenses?: number
+          description?: string
+          id?: string
+          nom: string
+          periode?: string
+          statut?: string
+          updated_at?: string
+        }
+        Update: {
+          budget_prevu?: number
+          created_at?: string
+          depenses?: number
+          description?: string
+          id?: string
+          nom?: string
+          periode?: string
+          statut?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

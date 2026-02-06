@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Download, FileSpreadsheet, Pencil, Plus, Search, Trash2, Upload } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { MainLayout } from '@/components/layout/MainLayout';
@@ -40,45 +40,34 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { services, operations, formatCurrency, formatDate } from '@/lib/mockData';
+import { services, formatCurrency, formatDate } from '@/lib/mockData';
 import { toast } from '@/hooks/use-toast';
-
-export interface DepenseItem {
-  id: string;
-  service: string;
-  operation: string;
-  date: string;
-  description: string;
-  montantTTC: number;
-  fournisseur: string;
-}
-
-const STORAGE_KEY = 'budget-pro-depenses-v2';
-
-const loadDepenses = (): DepenseItem[] => {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
-  }
-};
-
-const saveDepenses = (data: DepenseItem[]) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-};
+import { 
+  useDepenses, 
+  useCreateDepense, 
+  useUpdateDepense, 
+  useDeleteDepense,
+  useBulkCreateDepenses,
+  DepenseItem 
+} from '@/hooks/useDepenses';
+import { useOperations } from '@/hooks/useOperations';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function Depenses() {
-  const [depenses, setDepenses] = useState<DepenseItem[]>(loadDepenses);
+  const { data: depenses = [], isLoading } = useDepenses();
+  const { data: operations = [] } = useOperations();
+  const createDepense = useCreateDepense();
+  const updateDepense = useUpdateDepense();
+  const deleteDepense = useDeleteDepense();
+  const bulkCreateDepenses = useBulkCreateDepenses();
+
   const [selectedService, setSelectedService] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Dialog states
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingDepense, setEditingDepense] = useState<DepenseItem | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   
-  // Form state
   const [formData, setFormData] = useState({
     service: '',
     operation: '',
@@ -88,11 +77,6 @@ export default function Depenses() {
     fournisseur: '',
   });
 
-  useEffect(() => {
-    saveDepenses(depenses);
-  }, [depenses]);
-
-  // Filter depenses
   const filteredDepenses = depenses.filter((d) => {
     const matchesService = selectedService === 'all' || d.service === selectedService;
     const matchesSearch = 
@@ -102,7 +86,6 @@ export default function Depenses() {
     return matchesService && matchesSearch;
   });
 
-  // Open dialog for new depense
   const openNewDialog = () => {
     setEditingDepense(null);
     setFormData({
@@ -116,7 +99,6 @@ export default function Depenses() {
     setIsDialogOpen(true);
   };
 
-  // Open dialog for editing
   const openEditDialog = (depense: DepenseItem) => {
     setEditingDepense(depense);
     setFormData({
@@ -130,19 +112,13 @@ export default function Depenses() {
     setIsDialogOpen(true);
   };
 
-  // Save depense
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.service || !formData.date || !formData.description || !formData.montantTTC) {
-      toast({
-        title: "Erreur",
-        description: "Veuillez remplir tous les champs obligatoires.",
-        variant: "destructive",
-      });
+      toast({ title: "Erreur", description: "Veuillez remplir tous les champs obligatoires.", variant: "destructive" });
       return;
     }
 
-    const depenseData: DepenseItem = {
-      id: editingDepense?.id || Date.now().toString(),
+    const depenseData: Omit<DepenseItem, 'id'> = {
       service: formData.service,
       operation: formData.operation === 'none' ? '' : formData.operation,
       date: formData.date,
@@ -152,26 +128,23 @@ export default function Depenses() {
     };
 
     if (editingDepense) {
-      setDepenses(prev => prev.map(d => d.id === editingDepense.id ? depenseData : d));
+      await updateDepense.mutateAsync({ id: editingDepense.id, ...depenseData });
       toast({ title: "Dépense modifiée", description: "La dépense a été mise à jour." });
     } else {
-      setDepenses(prev => [...prev, depenseData]);
+      await createDepense.mutateAsync(depenseData);
       toast({ title: "Dépense créée", description: "La nouvelle dépense a été ajoutée." });
     }
-
     setIsDialogOpen(false);
   };
 
-  // Delete depense
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (deleteId) {
-      setDepenses(prev => prev.filter(d => d.id !== deleteId));
+      await deleteDepense.mutateAsync(deleteId);
       toast({ title: "Dépense supprimée", description: "La dépense a été supprimée." });
       setDeleteId(null);
     }
   };
 
-  // Export Excel
   const handleExportExcel = () => {
     const exportData = filteredDepenses.map(d => ({
       'Service': d.service,
@@ -185,30 +158,17 @@ export default function Depenses() {
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Dépenses');
-    
-    ws['!cols'] = [
-      { wch: 25 }, // Service
-      { wch: 35 }, // Opération
-      { wch: 12 }, // Date
-      { wch: 40 }, // Description
-      { wch: 15 }, // Montant TTC
-      { wch: 25 }, // Fournisseur
-    ];
-
+    ws['!cols'] = [{ wch: 25 }, { wch: 35 }, { wch: 12 }, { wch: 40 }, { wch: 15 }, { wch: 25 }];
     XLSX.writeFile(wb, `depenses_${new Date().toISOString().split('T')[0]}.xlsx`);
-    toast({
-      title: "Export réussi",
-      description: `${filteredDepenses.length} dépenses exportées en Excel.`,
-    });
+    toast({ title: "Export réussi", description: `${filteredDepenses.length} dépenses exportées en Excel.` });
   };
 
-  // Import CSV
-  const handleImportCSV = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const data = e.target?.result;
         const workbook = XLSX.read(data, { type: 'binary' });
@@ -216,8 +176,7 @@ export default function Depenses() {
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
-        const importedDepenses: DepenseItem[] = jsonData.map((row: any, index) => ({
-          id: `import-${Date.now()}-${index}`,
+        const importedDepenses: Omit<DepenseItem, 'id'>[] = jsonData.map((row: any) => ({
           service: row['Service'] || row['SERVICE'] || '',
           operation: row['Opération'] || row['OPÉRATION'] || row['OPERATION'] || '',
           date: parseImportDate(row['Date'] || row['DATE'] || new Date().toISOString()),
@@ -226,17 +185,10 @@ export default function Depenses() {
           fournisseur: row['Fournisseur'] || row['FOURNISSEUR'] || '',
         }));
 
-        setDepenses(prev => [...prev, ...importedDepenses]);
-        toast({
-          title: "Import réussi",
-          description: `${importedDepenses.length} dépenses importées.`,
-        });
+        await bulkCreateDepenses.mutateAsync(importedDepenses);
+        toast({ title: "Import réussi", description: `${importedDepenses.length} dépenses importées.` });
       } catch (error) {
-        toast({
-          title: "Erreur d'import",
-          description: "Le fichier n'a pas pu être lu. Vérifiez le format.",
-          variant: "destructive",
-        });
+        toast({ title: "Erreur d'import", description: "Le fichier n'a pas pu être lu.", variant: "destructive" });
       }
     };
     reader.readAsBinaryString(file);
@@ -245,81 +197,59 @@ export default function Depenses() {
 
   const parseImportDate = (dateStr: string): string => {
     if (!dateStr) return new Date().toISOString().split('T')[0];
-    
-    // Try DD/MM/YYYY format
     const frMatch = dateStr.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-    if (frMatch) {
-      return `${frMatch[3]}-${frMatch[2]}-${frMatch[1]}`;
-    }
-    
-    // Try ISO format
-    if (dateStr.includes('-')) {
-      return dateStr.split('T')[0];
-    }
-    
+    if (frMatch) return `${frMatch[3]}-${frMatch[2]}-${frMatch[1]}`;
+    if (dateStr.includes('-')) return dateStr.split('T')[0];
     return new Date().toISOString().split('T')[0];
   };
+
+  if (isLoading) {
+    return (
+      <MainLayout>
+        <PageHeader title="Dépenses" />
+        <div className="p-6 space-y-4">
+          {[...Array(5)].map((_, i) => (<Skeleton key={i} className="h-16 w-full" />))}
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
       <PageHeader title="Dépenses">
         <label className="cursor-pointer">
-          <input
-            type="file"
-            accept=".csv,.xlsx,.xls"
-            onChange={handleImportCSV}
-            className="hidden"
-          />
+          <input type="file" accept=".csv,.xlsx,.xls" onChange={handleImportCSV} className="hidden" />
           <Button variant="outline" size="sm" asChild>
-            <span>
-              <Upload className="w-4 h-4 mr-2" />
-              Importer CSV
-            </span>
+            <span><Upload className="w-4 h-4 mr-2" />Importer CSV</span>
           </Button>
         </label>
         <Button variant="outline" size="sm" onClick={handleExportExcel}>
-          <Download className="w-4 h-4 mr-2" />
-          Exporter
+          <Download className="w-4 h-4 mr-2" />Exporter
         </Button>
         <Button size="sm" onClick={openNewDialog}>
-          <Plus className="w-4 h-4 mr-2" />
-          Nouvelle dépense
+          <Plus className="w-4 h-4 mr-2" />Nouvelle dépense
         </Button>
       </PageHeader>
 
       <div className="flex-1 overflow-y-auto p-6">
-        {/* Subtitle */}
         <p className="text-muted-foreground mb-6">Saisie et suivi des dépenses</p>
 
-        {/* Filters */}
         <div className="flex flex-wrap gap-4 mb-6">
           <div className="w-64">
             <Select value={selectedService} onValueChange={setSelectedService}>
-              <SelectTrigger>
-                <SelectValue placeholder="Tous les services" />
-              </SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Tous les services" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tous les services</SelectItem>
-                {services.map((service) => (
-                  <SelectItem key={service.id} value={service.nom}>
-                    {service.nom}
-                  </SelectItem>
-                ))}
+                {services.map((service) => (<SelectItem key={service.id} value={service.nom}>{service.nom}</SelectItem>))}
               </SelectContent>
             </Select>
           </div>
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Rechercher..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
+            <Input placeholder="Rechercher..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
           </div>
         </div>
 
-        {/* Table */}
         <div className="rounded-lg border bg-card">
           <Table>
             <TableHeader>
@@ -336,9 +266,7 @@ export default function Depenses() {
             <TableBody>
               {filteredDepenses.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                    Aucune dépense
-                  </TableCell>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">Aucune dépense</TableCell>
                 </TableRow>
               ) : (
                 filteredDepenses.map((depense) => (
@@ -347,24 +275,14 @@ export default function Depenses() {
                     <TableCell>{depense.operation || '-'}</TableCell>
                     <TableCell>{formatDate(depense.date)}</TableCell>
                     <TableCell>{depense.description}</TableCell>
-                    <TableCell className="text-right font-medium">
-                      {formatCurrency(depense.montantTTC)}
-                    </TableCell>
+                    <TableCell className="text-right font-medium">{formatCurrency(depense.montantTTC)}</TableCell>
                     <TableCell>{depense.fournisseur || '-'}</TableCell>
                     <TableCell>
                       <div className="flex items-center justify-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openEditDialog(depense)}
-                        >
+                        <Button variant="ghost" size="icon" onClick={() => openEditDialog(depense)}>
                           <Pencil className="w-4 h-4" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setDeleteId(depense.id)}
-                        >
+                        <Button variant="ghost" size="icon" onClick={() => setDeleteId(depense.id)}>
                           <Trash2 className="w-4 h-4 text-destructive" />
                         </Button>
                       </div>
@@ -377,17 +295,12 @@ export default function Depenses() {
         </div>
       </div>
 
-      {/* Create/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>
-              {editingDepense ? 'Modifier la dépense' : 'Nouvelle dépense'}
-            </DialogTitle>
+            <DialogTitle>{editingDepense ? 'Modifier la dépense' : 'Nouvelle dépense'}</DialogTitle>
             <DialogDescription>
-              {editingDepense 
-                ? 'Modifiez les informations de la dépense.'
-                : 'Saisissez les informations de la nouvelle dépense.'}
+              {editingDepense ? 'Modifiez les informations de la dépense.' : 'Saisissez les informations de la nouvelle dépense.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -395,39 +308,21 @@ export default function Depenses() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="service">Service *</Label>
-                <Select
-                  value={formData.service}
-                  onValueChange={(value) => setFormData({ ...formData, service: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner..." />
-                  </SelectTrigger>
+                <Select value={formData.service} onValueChange={(value) => setFormData({ ...formData, service: value })}>
+                  <SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger>
                   <SelectContent>
-                    {services.map((service) => (
-                      <SelectItem key={service.id} value={service.nom}>
-                        {service.nom}
-                      </SelectItem>
-                    ))}
+                    {services.map((service) => (<SelectItem key={service.id} value={service.nom}>{service.nom}</SelectItem>))}
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="operation">Opération</Label>
-                <Select
-                  value={formData.operation}
-                  onValueChange={(value) => setFormData({ ...formData, operation: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner..." />
-                  </SelectTrigger>
+                <Select value={formData.operation} onValueChange={(value) => setFormData({ ...formData, operation: value })}>
+                  <SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Aucune</SelectItem>
-                    {operations.map((op) => (
-                      <SelectItem key={op.id} value={op.nom}>
-                        {op.nom}
-                      </SelectItem>
-                    ))}
+                    {operations.map((op) => (<SelectItem key={op.id} value={op.nom}>{op.nom}</SelectItem>))}
                   </SelectContent>
                 </Select>
               </div>
@@ -436,60 +331,35 @@ export default function Depenses() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="date">Date *</Label>
-                <Input
-                  id="date"
-                  type="date"
-                  value={formData.date}
-                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                />
+                <Input id="date" type="date" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="montant">Montant TTC *</Label>
-                <Input
-                  id="montant"
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={formData.montantTTC}
-                  onChange={(e) => setFormData({ ...formData, montantTTC: e.target.value })}
-                />
+                <Input id="montant" type="number" step="0.01" placeholder="0.00" value={formData.montantTTC} onChange={(e) => setFormData({ ...formData, montantTTC: e.target.value })} />
               </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="description">Description *</Label>
-              <Textarea
-                id="description"
-                placeholder="Description de la dépense..."
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              />
+              <Textarea id="description" placeholder="Description de la dépense..." value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="fournisseur">Fournisseur</Label>
-              <Input
-                id="fournisseur"
-                placeholder="Nom du fournisseur"
-                value={formData.fournisseur}
-                onChange={(e) => setFormData({ ...formData, fournisseur: e.target.value })}
-              />
+              <Input id="fournisseur" placeholder="Nom du fournisseur" value={formData.fournisseur} onChange={(e) => setFormData({ ...formData, fournisseur: e.target.value })} />
             </div>
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-              Annuler
-            </Button>
-            <Button onClick={handleSave}>
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Annuler</Button>
+            <Button onClick={handleSave} disabled={createDepense.isPending || updateDepense.isPending}>
               {editingDepense ? 'Enregistrer' : 'Créer'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

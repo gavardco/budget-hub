@@ -1,74 +1,19 @@
-import { useState, useEffect } from 'react';
 import { FileText, Receipt, TrendingDown, Wallet } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { KPICard } from '@/components/ui/KPICard';
-import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
-  demandes as initialDemandes, 
-  formatCurrency, 
-  formatDate, 
-  Demande
-} from '@/lib/mockData';
+import { formatCurrency, formatDate } from '@/lib/mockData';
 import dashboardBanner from '@/assets/dashboard-banner.png';
-
-const DEMANDES_STORAGE_KEY = 'budget-pro-demandes';
-const DEPENSES_V2_STORAGE_KEY = 'budget-pro-depenses-v2';
-
-// New depense format
-interface DepenseV2 {
-  id: string;
-  service: string;
-  operation: string;
-  date: string;
-  description: string;
-  montantTTC: number;
-  fournisseur: string;
-}
-
-// Load data from localStorage
-const loadFromStorage = <T,>(key: string, initial: T[]): T[] => {
-  try {
-    const stored = localStorage.getItem(key);
-    if (stored) {
-      return JSON.parse(stored);
-    }
-  } catch (error) {
-    console.error(`Error loading ${key} from localStorage:`, error);
-  }
-  return initial;
-};
+import { useDemandes } from '@/hooks/useDemandes';
+import { useDepenses } from '@/hooks/useDepenses';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function Dashboard() {
-  const [demandes, setDemandes] = useState<Demande[]>(() => 
-    loadFromStorage(DEMANDES_STORAGE_KEY, initialDemandes)
-  );
-  const [depenses, setDepenses] = useState<DepenseV2[]>(() => 
-    loadFromStorage<DepenseV2>(DEPENSES_V2_STORAGE_KEY, [])
-  );
+  const { data: demandes = [], isLoading: loadingDemandes } = useDemandes();
+  const { data: depenses = [], isLoading: loadingDepenses } = useDepenses();
 
-  // Listen for storage changes (when data is updated in other tabs/pages)
-  useEffect(() => {
-    const handleStorageChange = () => {
-      setDemandes(loadFromStorage(DEMANDES_STORAGE_KEY, initialDemandes));
-      setDepenses(loadFromStorage<DepenseV2>(DEPENSES_V2_STORAGE_KEY, []));
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    
-    // Also check on focus to catch same-tab updates
-    const handleFocus = () => {
-      setDemandes(loadFromStorage(DEMANDES_STORAGE_KEY, initialDemandes));
-      setDepenses(loadFromStorage<DepenseV2>(DEPENSES_V2_STORAGE_KEY, []));
-    };
-    window.addEventListener('focus', handleFocus);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('focus', handleFocus);
-    };
-  }, []);
+  const isLoading = loadingDemandes || loadingDepenses;
 
   // Calculate totals from current data
   const totals = {
@@ -105,32 +50,40 @@ export default function Dashboard() {
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <KPICard
-            title="Budget demandé"
-            value={formatCurrency(totals.budgetDemande)}
-            icon={FileText}
-            variant="budget"
-          />
-          <KPICard
-            title="Budget validé"
-            value={formatCurrency(totals.budgetValide)}
-            icon={Wallet}
-            variant="validated"
-          />
-          <KPICard
-            title="Dépensé"
-            value={formatCurrency(totals.totalDepenses)}
-            icon={Receipt}
-            variant="spent"
-          />
-          <KPICard
-            title="Reste à dépenser"
-            value={formatCurrency(Math.max(0, totals.resteADepenser))}
-            icon={TrendingDown}
-            variant="remaining"
-          />
-        </div>
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[...Array(4)].map((_, i) => (
+              <Skeleton key={i} className="h-32" />
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <KPICard
+              title="Budget demandé"
+              value={formatCurrency(totals.budgetDemande)}
+              icon={FileText}
+              variant="budget"
+            />
+            <KPICard
+              title="Budget validé"
+              value={formatCurrency(totals.budgetValide)}
+              icon={Wallet}
+              variant="validated"
+            />
+            <KPICard
+              title="Dépensé"
+              value={formatCurrency(totals.totalDepenses)}
+              icon={Receipt}
+              variant="spent"
+            />
+            <KPICard
+              title="Reste à dépenser"
+              value={formatCurrency(Math.max(0, totals.resteADepenser))}
+              icon={TrendingDown}
+              variant="remaining"
+            />
+          </div>
+        )}
 
         {/* Last Depenses */}
         <div className="grid grid-cols-1 gap-6">
@@ -143,7 +96,13 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent className="p-0">
               <div className="divide-y divide-border">
-                {lastDepenses.length === 0 ? (
+                {isLoading ? (
+                  <div className="px-6 py-4 space-y-4">
+                    {[...Array(3)].map((_, i) => (
+                      <Skeleton key={i} className="h-12 w-full" />
+                    ))}
+                  </div>
+                ) : lastDepenses.length === 0 ? (
                   <div className="px-6 py-8 text-center text-muted-foreground">
                     Aucune dépense enregistrée
                   </div>
