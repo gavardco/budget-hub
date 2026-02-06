@@ -190,8 +190,9 @@ export default function Demandes() {
   };
 
   // Parse amount string to number (handles multiple formats):
-  // - "€ 40,000" (English format with € prefix)
-  // - "1 500,00 €" (French format with € suffix)
+  // - "€ 40,000" (English format with € prefix, comma = thousand separator)
+  // - "1 500,00 €" (French format with € suffix, space = thousand, comma = decimal)
+  // - "260,00 €" (French format, comma = decimal)
   // - "1500.00", "1500,00", etc.
   const parseAmount = (value: unknown): number => {
     if (typeof value === 'number') return value;
@@ -199,39 +200,52 @@ export default function Demandes() {
     
     let str = String(value).trim();
     
-    // Remove € symbol and spaces
-    str = str.replace(/€/g, '').replace(/\s/g, '').trim();
+    // Remove € symbol
+    str = str.replace(/€/g, '').trim();
     
-    // Detect format: if we have both comma and dot, determine which is decimal separator
-    const hasComma = str.includes(',');
-    const hasDot = str.includes('.');
+    // Check if it's French format with space as thousand separator (e.g., "3 000,00")
+    // This must be checked BEFORE removing spaces
+    const hasFrenchFormat = /\d+\s+\d{3}/.test(str) || /\d+,\d{2}$/.test(str.replace(/\s/g, ''));
     
-    if (hasComma && hasDot) {
-      // Both present: last one is decimal separator
-      const lastComma = str.lastIndexOf(',');
-      const lastDot = str.lastIndexOf('.');
-      if (lastComma > lastDot) {
-        // Format: 1.500,00 (European)
-        str = str.replace(/\./g, '').replace(',', '.');
-      } else {
-        // Format: 1,500.00 (English)
-        str = str.replace(/,/g, '');
+    if (hasFrenchFormat && str.includes(',')) {
+      // French format: spaces are thousand separators, comma is decimal
+      str = str.replace(/\s/g, ''); // Remove thousand separators (spaces)
+      str = str.replace(',', '.'); // Convert decimal comma to dot
+    } else {
+      // Remove spaces
+      str = str.replace(/\s/g, '');
+      
+      // Detect format based on comma/dot positions
+      const hasComma = str.includes(',');
+      const hasDot = str.includes('.');
+      
+      if (hasComma && hasDot) {
+        // Both present: last one is decimal separator
+        const lastComma = str.lastIndexOf(',');
+        const lastDot = str.lastIndexOf('.');
+        if (lastComma > lastDot) {
+          // Format: 1.500,00 (European)
+          str = str.replace(/\./g, '').replace(',', '.');
+        } else {
+          // Format: 1,500.00 (English)
+          str = str.replace(/,/g, '');
+        }
+      } else if (hasComma) {
+        // Only comma: check position to determine if it's decimal or thousand separator
+        const parts = str.split(',');
+        if (parts.length === 2 && parts[1].length === 2) {
+          // Decimal separator (e.g., "260,00" -> 260.00)
+          str = str.replace(',', '.');
+        } else if (parts.length === 2 && parts[1].length === 3) {
+          // Thousand separator (e.g., "40,000" -> 40000)
+          str = str.replace(/,/g, '');
+        } else {
+          // Multiple commas = thousand separators
+          str = str.replace(/,/g, '');
+        }
       }
-    } else if (hasComma) {
-      // Only comma: check if it's thousand separator (e.g., "40,000") or decimal (e.g., "40,50")
-      const parts = str.split(',');
-      if (parts.length === 2 && parts[1].length === 3) {
-        // Thousand separator (e.g., "40,000" -> 40000)
-        str = str.replace(/,/g, '');
-      } else if (parts.length === 2 && parts[1].length <= 2) {
-        // Decimal separator (e.g., "40,50" -> 40.50)
-        str = str.replace(',', '.');
-      } else {
-        // Multiple commas = thousand separators
-        str = str.replace(/,/g, '');
-      }
+      // If only dot, it's already in correct format
     }
-    // If only dot, it's already in correct format
     
     const num = parseFloat(str);
     return isNaN(num) ? 0 : num;
