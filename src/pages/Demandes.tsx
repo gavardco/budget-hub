@@ -189,22 +189,76 @@ export default function Demandes() {
     });
   };
 
-  // Parse row data to Demande
+  // Parse amount string to number (handles "1 500,00 €", "1500.00", "1500,00", etc.)
+  const parseAmount = (value: unknown): number => {
+    if (typeof value === 'number') return value;
+    if (!value) return 0;
+    const str = String(value)
+      .replace(/\s/g, '') // Remove spaces
+      .replace('€', '') // Remove €
+      .replace(/\./g, '') // Remove thousand separators (dots in French)
+      .replace(',', '.') // Replace decimal comma with dot
+      .trim();
+    const num = parseFloat(str);
+    return isNaN(num) ? 0 : num;
+  };
+
+  // Parse row data to Demande (handles multiple CSV column formats)
   const parseRowToDemande = (row: Record<string, unknown>, index: number): Demande => {
-    const service = String(row['Service'] || row['service'] || '');
-    const domaine = String(row['Domaine'] || row['domaine'] || '');
-    const categorieRaw = String(row['Catégorie'] || row['categorie'] || row['Categorie'] || '');
-    const categorie = categorieRaw === 'Investissement' ? 'Investissement' : 'Fonctionnement';
-    const description = String(row['Description'] || row['description'] || '');
-    const justification = String(row['Justification'] || row['justification'] || '');
-    const budgetTitre = parseFloat(String(row['Budget titre'] || row['budget_titre'] || row['BudgetTitre'] || 0)) || 0;
-    const budgetValide = parseFloat(String(row['Budget validé'] || row['budget_valide'] || row['BudgetValide'] || 0)) || 0;
-    const statutRaw = String(row['Statut'] || row['statut'] || 'Brouillon');
-    const statut = (['Brouillon', 'En attente', 'Validé', 'Rejeté'].includes(statutRaw) ? statutRaw : 'Brouillon') as Demande['statut'];
-    const dateCreation = String(row['Date création'] || row['date_creation'] || row['DateCreation'] || new Date().toISOString().split('T')[0]);
+    // Service - handle various column names
+    const service = String(
+      row['SERVICE'] || row['Service'] || row['service'] || ''
+    ).trim();
+
+    // Domaine
+    const domaine = String(
+      row['DOMAINE'] || row['Domaine'] || row['domaine'] || ''
+    ).trim();
+
+    // Catégorie - handle CATEGORIE, Catégorie, categorie, and normalize values
+    const categorieRaw = String(
+      row['CATEGORIE'] || row['Catégorie'] || row['categorie'] || row['Categorie'] || ''
+    ).trim().toUpperCase();
+    const categorie: 'Fonctionnement' | 'Investissement' = 
+      categorieRaw.includes('INVEST') ? 'Investissement' : 'Fonctionnement';
+
+    // Description
+    const description = String(
+      row['DESCRIPTION'] || row['Description'] || row['description'] || ''
+    ).trim();
+
+    // Justification - handle various column names
+    const justification = String(
+      row['JUSTIFICATION'] || row['Justification'] || row['justification'] || 
+      row['JUSTIFICATIONS'] || row['Justifications'] || ''
+    ).trim();
+
+    // Budget demandé - handle various column names: "BUDGET ", "BUDGET TTC", "Budget titre", etc.
+    const budgetTitre = parseAmount(
+      row['BUDGET '] || row['BUDGET'] || row['BUDGET TTC'] || 
+      row['Budget titre'] || row['budget_titre'] || row['BudgetTitre'] || 0
+    );
+
+    // Budget validé - handle various column names
+    const budgetValide = parseAmount(
+      row['BUDGET VALIDE'] || row['BUDGET VALIDE par la commission Finance'] ||
+      row['Budget validé'] || row['budget_valide'] || row['BudgetValide'] || 0
+    );
+
+    // Statut - default to 'Brouillon' for imported items
+    const statutRaw = String(row['Statut'] || row['statut'] || row['STATUT'] || 'Brouillon').trim();
+    const statut = (['Brouillon', 'En attente', 'Validé', 'Rejeté'].includes(statutRaw) 
+      ? statutRaw 
+      : 'Brouillon') as Demande['statut'];
+
+    // Date création
+    const dateCreation = String(
+      row['Date création'] || row['date_creation'] || row['DateCreation'] || 
+      new Date().toISOString().split('T')[0]
+    );
 
     return {
-      id: String(Date.now() + index),
+      id: String(Date.now() + index + Math.random()),
       service,
       domaine,
       categorie,
