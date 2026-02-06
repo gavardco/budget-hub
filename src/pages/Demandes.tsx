@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Download, FileUp, Pencil, Plus, Search } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -30,6 +30,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { demandes as initialDemandes, services, formatCurrency, Demande } from '@/lib/mockData';
+import { toast } from '@/hooks/use-toast';
 
 const categories = ['Fonctionnement', 'Investissement'];
 const statuts = ['Brouillon', 'En attente', 'Validé', 'Rejeté'];
@@ -42,6 +43,7 @@ export default function Demandes() {
   const [filterStatut, setFilterStatut] = useState<string>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingDemande, setEditingDemande] = useState<Demande | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
     service: '',
@@ -112,14 +114,108 @@ export default function Demandes() {
     setIsDialogOpen(false);
   };
 
+  // Export CSV
+  const handleExportCSV = () => {
+    const headers = ['Service', 'Domaine', 'Catégorie', 'Description', 'Justification', 'Budget titre', 'Budget validé', 'Statut', 'Date création'];
+    const csvContent = [
+      headers.join(';'),
+      ...demandes.map(d => [
+        d.service,
+        d.domaine,
+        d.categorie,
+        `"${d.description.replace(/"/g, '""')}"`,
+        `"${d.justification.replace(/"/g, '""')}"`,
+        d.budgetTitre,
+        d.budgetValide,
+        d.statut,
+        d.dateCreation
+      ].join(';'))
+    ].join('\n');
+
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `demandes_budgetaires_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: "Export réussi",
+      description: `${demandes.length} demandes exportées en CSV.`,
+    });
+  };
+
+  // Import CSV
+  const handleImportCSV = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result as string;
+        const lines = text.split('\n').filter(line => line.trim());
+        
+        // Skip header
+        const dataLines = lines.slice(1);
+        
+        const newDemandes: Demande[] = dataLines.map((line, index) => {
+          const values = line.split(';').map(v => v.replace(/^"|"$/g, '').replace(/""/g, '"').trim());
+          
+          return {
+            id: String(Date.now() + index),
+            service: values[0] || '',
+            domaine: values[1] || '',
+            categorie: (values[2] === 'Investissement' ? 'Investissement' : 'Fonctionnement') as 'Fonctionnement' | 'Investissement',
+            description: values[3] || '',
+            justification: values[4] || '',
+            budgetTitre: parseFloat(values[5]) || 0,
+            budgetValide: parseFloat(values[6]) || 0,
+            statut: (['Brouillon', 'En attente', 'Validé', 'Rejeté'].includes(values[7]) ? values[7] : 'Brouillon') as Demande['statut'],
+            dateCreation: values[8] || new Date().toISOString().split('T')[0],
+          };
+        });
+
+        setDemandes(prev => [...newDemandes, ...prev]);
+        
+        toast({
+          title: "Import réussi",
+          description: `${newDemandes.length} demandes importées.`,
+        });
+      } catch (error) {
+        toast({
+          title: "Erreur d'import",
+          description: "Le fichier CSV n'a pas pu être lu correctement.",
+          variant: "destructive",
+        });
+      }
+    };
+    reader.readAsText(file);
+    
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   return (
     <MainLayout>
       <PageHeader title="Demandes budgétaires">
-        <Button variant="outline" size="sm">
+        <input
+          type="file"
+          ref={fileInputRef}
+          accept=".csv"
+          onChange={handleImportCSV}
+          className="hidden"
+        />
+        <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
           <FileUp className="w-4 h-4 mr-2" />
           Importer CSV
         </Button>
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="sm" onClick={handleExportCSV}>
           <Download className="w-4 h-4 mr-2" />
           Exporter CSV
         </Button>
