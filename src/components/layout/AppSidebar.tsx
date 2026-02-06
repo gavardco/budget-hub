@@ -24,9 +24,6 @@ const menuItems = [
   { icon: Receipt, label: 'Dépenses', path: '/depenses' },
   { icon: FolderKanban, label: 'Opérations', path: '/operations' },
   { icon: Calendar, label: 'Campagnes', path: '/campagnes' },
-  { icon: Building2, label: 'Services', path: '/services' },
-  { icon: Users, label: 'Utilisateurs', path: '/utilisateurs' },
-  { icon: Settings, label: 'Paramètres', path: '/parametres' },
 ];
 
 export function AppSidebar() {
