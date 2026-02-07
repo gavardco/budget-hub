@@ -167,3 +167,29 @@ export function useBulkCreateDemandes() {
     },
   });
 }
+
+export function useDeleteAllDemandes() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from('demandes')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all rows
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['demandes'] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer toutes les demandes.",
+        variant: "destructive",
+      });
+      console.error('Delete all demandes error:', error);
+    },
+  });
+}

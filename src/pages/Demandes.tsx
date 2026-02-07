@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Download, FileUp, Pencil, Plus, Search, FileSpreadsheet, Trash2 } from 'lucide-react';
+import { Download, FileUp, Pencil, Plus, Search, FileSpreadsheet, Trash2, RotateCcw } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -48,6 +48,7 @@ import {
   useUpdateDemande, 
   useDeleteDemande,
   useBulkCreateDemandes,
+  useDeleteAllDemandes,
   Demande 
 } from '@/hooks/useDemandes';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -61,7 +62,7 @@ export default function Demandes() {
   const updateDemande = useUpdateDemande();
   const deleteDemande = useDeleteDemande();
   const bulkCreateDemandes = useBulkCreateDemandes();
-
+  const deleteAllDemandes = useDeleteAllDemandes();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterService, setFilterService] = useState<string>('all');
   const [filterDomaine, setFilterDomaine] = useState<string>('all');
@@ -73,6 +74,7 @@ export default function Demandes() {
   const [editingDemande, setEditingDemande] = useState<Demande | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [demandeToDelete, setDemandeToDelete] = useState<Demande | null>(null);
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
@@ -157,6 +159,11 @@ export default function Demandes() {
     setDemandeToDelete(null);
   };
 
+  const handleResetAll = async () => {
+    await deleteAllDemandes.mutateAsync();
+    toast({ title: "Réinitialisation effectuée", description: "Toutes les demandes ont été supprimées." });
+    setResetDialogOpen(false);
+  };
   // Export Excel
   const handleExportExcel = () => {
     const exportData = demandes.map(d => ({
@@ -351,6 +358,9 @@ export default function Demandes() {
         <Button variant="outline" size="sm" onClick={handleExportCSV}>
           <Download className="w-4 h-4 mr-2" />Export CSV
         </Button>
+        <Button variant="outline" size="sm" onClick={() => setResetDialogOpen(true)} className="text-destructive hover:text-destructive hover:bg-destructive/10">
+          <RotateCcw className="w-4 h-4 mr-2" />Réinitialiser
+        </Button>
         <Button size="sm" onClick={openNewDialog}>
           <Plus className="w-4 h-4 mr-2" />Nouvelle demande
         </Button>
@@ -526,6 +536,24 @@ export default function Demandes() {
             <AlertDialogCancel>Annuler</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Reset All Dialog */}
+      <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Réinitialiser toutes les demandes ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible. Toutes les demandes budgétaires ({demandes.length}) seront définitivement supprimées.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={handleResetAll} disabled={deleteAllDemandes.isPending} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Supprimer tout
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
