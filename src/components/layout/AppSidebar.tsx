@@ -21,9 +21,6 @@ import { Separator } from '@/components/ui/separator';
 const menuItems = [
   { icon: LayoutDashboard, label: 'Tableau de bord', path: '/' },
   { icon: FileText, label: 'Demandes', path: '/demandes' },
-  { icon: Receipt, label: 'Dépenses', path: '/depenses' },
-  { icon: FolderKanban, label: 'Opérations', path: '/operations' },
-  { icon: Calendar, label: 'Campagnes', path: '/campagnes' },
 ];
 
 export function AppSidebar() {
